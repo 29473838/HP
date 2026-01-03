@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>관리자 로그인 · 18e Régiment</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="login-page">
+  <div class="bg-texture" aria-hidden="true"></div>
+
+  <main class="login-wrap">
+    <a class="brand login-brand" href="/" aria-label="메인으로">
+      <span class="brand__crest" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="34" height="34" fill="none">
+          <path d="M32 4c10 7 20 7 28 8v18c0 18-12 26-28 30C16 56 4 48 4 30V12c8-1 18-1 28-8Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M20 26h24M20 34h24M32 18v28" stroke="currentColor" stroke-width="2" opacity=".85"/>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <span class="brand__title">2e Corps · 18e Régiment</span>
+        <span class="brand__sub">관리자 로그인</span>
+      </span>
+    </a>
+
+    <section class="card login-card">
+      <h1 class="login-title">Admin Access</h1>
+      <p class="muted login-sub">게임 가이드 저장/이미지 업로드 등 관리 기능을 사용하려면 로그인하세요.</p>
+
+      {% if error %}
+        <div class="login-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" class="login-form" autocomplete="off">
+        <input type="hidden" name="next" value="{{ next }}" />
+        <label class="login-label" for="password">비밀번호</label>
+        <input class="input login-input" id="password" name="password" type="password" required placeholder="관리자 비밀번호 입력" />
+        <button class="btn btn--primary login-btn" type="submit">로그인</button>
+      </form>
+
+      <div class="login-links">
+        <a class="btn btn--ghost btn--sm" href="/">메인으로</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>프랑스 제2군단 · 제18연대</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:wght@400;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
+
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- 배경 장식 -->
+  <div class="bg-texture" aria-hidden="true"></div>
+  <div class="bg-fleur" aria-hidden="true"></div>
+
+  <!-- 상단 고정 메뉴 -->
+  <header class="topbar">
+    <div class="topbar__inner container">
+      <a class="brand" href="#top" aria-label="상단으로">
+        <span class="brand__crest" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="34" height="34" fill="none">
+            <path d="M32 4c10 7 20 7 28 8v18c0 18-12 26-28 30C16 56 4 48 4 30V12c8-1 18-1 28-8Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M20 26h24M20 34h24M32 18v28" stroke="currentColor" stroke-width="2" opacity=".85"/>
+          </svg>
+        </span>
+        <span class="brand__text">
+          <span class="brand__title">Deuxième CORPS</span>
+          <span class="brand__sub">프랑스 제2군단 · 제18연대</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="주요 메뉴">
+        <a href="#regiment">연대</a>
+        <a href="#battalion">대대</a>
+        <a href="#company">중대</a>
+        <a href="#guide">게임 가이드</a>
+        <a href="#org">조직도</a>
+        <a href="#medals">훈장 리스트</a>
+        <a href="#promotion">진급 방식</a>
+      
+        {% if is_admin %}
+        <a href="/admin/logout">로그아웃</a>
+        {% else %}
+        <a href="/admin/login?next=/#guide">관리자 로그인</a>
+        {% endif %}
+</nav>
+
+      <button class="nav__toggle" id="navToggle" aria-label="메뉴 열기/닫기" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <div class="nav-mobile container" id="navMobile" aria-hidden="true">
+      <a href="#regiment">연대</a>
+      <a href="#battalion">대대</a>
+      <a href="#company">중대</a>
+      <a href="#guide">게임 가이드</a>
+      <a href="#org">조직도</a>
+      <a href="#medals">훈장 리스트</a>
+      <a href="#promotion">진급 방식</a>
+    
+      {% if is_admin %}
+      <a href="/admin/logout">로그아웃</a>
+      {% else %}
+      <a href="/admin/login?next=/#guide">관리자 로그인</a>
+      {% endif %}
+</div>
+  </header>
+
+  <main id="top">
+    <!-- 히어로 -->
+    <section class="hero">
+      <div class="container hero__inner">
+        <div class="container hero__inner hero__inner--center">
+          <div class="hero__copy reveal hero__copy--center">
+            <p class="kicker"> · Deuxième CORPS · </p>
+            <h1 class="hero__title">NW 프랑스<br><span class="gold">2군단 18연대</span></h1>
+            <p class="hero__desc">
+              18연대의 NW 게임 가이드 및 연대 소개 페이지입니다.
+            </p>
+            <div class="hero__cta hero__cta--center">
+              <a class="btn btn--primary" href="#org">조직도 보기</a>
+              <a class="btn btn--ghost" href="#guide">게임 가이드</a>
+            </div>
+
+            <div class="ribbon ribbon--center" aria-hidden="true">
+              <span class="ribbon__edge ribbon__edge--l"></span>
+              <span class="ribbon__body">⚜ Royaume & Régiment ⚜</span>
+              <span class="ribbon__edge ribbon__edge--r"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <!-- 연대 -->
+    <section class="section" id="regiment">
+      <div class="container">
+
+        <div class="section-banner reveal">
+          <img src="/static/banners/regiment.png" alt="18e Régiment 배너" loading="lazy">
+        </div>
+        <div class="section__head reveal">
+          <h2>18연대</h2>
+          <p>18ème Régiment d'Infanterie de Ligne</p>
+        </div>
+
+        <div class="grid grid--3">
+          <article class="card reveal">
+            <h3>18연대</h3>
+            <p>18연대는 프랑스의 유일한 한국인 연대입니다.</p>
+            <div class="divider"></div>
+            <p class="muted">18연대 예하로, 2개의 대대와 2개의 정예,세미 정예중대, 2개의 일반중대로 나뉩니다. </p>
+          </article>
+
+          <article class="card reveal">
+            <h3>18연대의 장점</h3>
+            <p>18연대는 한국인 특화 연대로서, 다양한 전술들을 배울 수 있고, 소통도 더 원할하다는 장점이 있습니다.</p>
+            <div class="badge-row">
+              <span class="badge badge--gold">한국인 특화</span>
+              <span class="badge badge--red">소통력 상승</span>
+              <span class="badge badge--blue">다양한 전술</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 대대 -->
+    <section class="section section--alt" id="battalion">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>1,2대대</h2>
+          <p>1er,2e Bataillon</p>
+        </div>
+
+        <div class="grid grid--2">
+          <article class="card reveal">
+            <h3>1대대</h3>
+            <p class="muted">1er Bataillon</p>
+            <ul class="list">
+              <li>정예/세미 정예 중대 운영</li>
+              <li>Compagnie de Grenadiers "Les Braves"</li>
+              <li>Compagnie de Voltigeurs "Friedland"</li>
+            </ul>
+          </article>
+          <article class="card reveal">
+            <h3>2대대</h3>
+            <p class="muted">2ème Bataillon</p>
+            <ul class="list">
+              <li>일반 중대 운영</li>
+              <li>1er Compagnie de Fusiliers "Dijon"</li>
+              <li>2ème Compagnie de Fusiliers "Esslingen"</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 중대소개 -->
+    <section class="section" id="company">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>중대</h2>
+          <p>Compagnie</p>
+        </div>
+
+        
+        <div class="company-groups">
+          <!-- Grenadiers -->
+          <div class="company-group">
+            <div class="section-banner section-banner--company reveal">
+              <img src="/static/banners/grenadiers.png" alt="Grenadiers — Les Braves" loading="lazy">
+            </div>
+            <article class="card card--accent reveal">
+              <h3>Compagnie de Grenadiers <span class="muted">"Les Braves"</span></h3>
+              <p>정예 중대 — 경력이 많고 능력이 출중한 인원으로 구성된 최정예 부대</p>
+            </article>
+          </div>
+
+          <!-- Voltigeurs -->
+          <div class="company-group">
+            <div class="section-banner section-banner--company reveal">
+              <img src="/static/banners/voltigeurs.png" alt="Voltigeurs — Friedland" loading="lazy">
+            </div>
+            <article class="card card--accent reveal">
+              <h3>Compagnie de Voltigeurs <span class="muted">"Friedland"</span></h3>
+              <p>세미 정예 중대 — 일반보다 높은 숙련도를 요구하며, 정예 부대의 예비 전력으로 운용</p>
+            </article>
+          </div>
+
+          <!-- Fusiliers -->
+          <div class="company-group">
+            <div class="section-banner section-banner--company reveal">
+              <img src="/static/banners/fusiliers.png" alt="Fusiliers — Dijon & Esslingen" loading="lazy">
+            </div>
+
+            <div class="grid grid--2">
+              <article class="card card--accent reveal">
+                <h3>1er Compagnie de Fusiliers <span class="muted">"Dijon"</span></h3>
+                <p>일반 중대 — 신병 교육과 첫 전투를 마친 병사들이 소속되는 기본 편성</p>
+              </article>
+              <article class="card card--accent reveal">
+                <h3>2ème Compagnie de Fusiliers <span class="muted">"Esslingen"</span></h3>
+                <p>일반 중대 — 초대로만 입대 가능한 중대(기본 편성과 동일 기준)</p>
+              </article>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 게임 가이드 (스프레드시트 연동 + 검색/아코디언) -->
+    <section class="section section--alt" id="guide">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>게임 가이드</h2>
+          <p>이미지와 서식을 포함해 직접 작성하고 저장할 수 있습니다.</p>
+        </div>
+
+        <div class="card reveal">
+          <div class="toolbar">
+            <div class="toolbar__left">
+              {% if is_admin %}<span class="badge badge--gold">관리자</span>{% else %}<span class="badge">읽기 전용</span>{% endif %}
+              <span class="muted">마지막 저장: <code id="guideSavedAt">-</code></span>
+              {% if not is_admin %}<span class="muted">· <a href="/admin/login?next=/#guide">관리자 로그인</a></span>{% endif %}
+            </div>
+            <div class="toolbar__right">
+              {% if is_admin %}
+              <button class="btn btn--ghost btn--sm" id="guideEditBtn">편집</button>
+              <button class="btn btn--primary btn--sm" id="guideSaveBtn" hidden>저장</button>
+              <button class="btn btn--ghost btn--sm" id="guideCancelBtn" hidden>취소</button>
+              {% endif %}
+            </div>
+          </div>
+
+          <div id="guideView" class="guide-view" aria-live="polite"></div>
+
+          <div id="guideEditorWrap" class="guide-editor-wrap" hidden>
+            <div id="guideEditor" class="guide-editor"></div>
+            <div class="muted" style="margin-top:10px; font-size:13px">
+              이미지 버튼을 누르면 업로드 후 본문에 삽입됩니다. 삽입된 이미지는 <b>클릭</b>해서 크기/정렬을 조절할 수 있습니다.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 조직도 (스프레드시트 연동 + 계급 색/훈장/프로필 링크 + 검색) -->
+    <section class="section" id="org">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>조직도</h2>
+          <p>18연대의 조직도</p>
+        </div>
+
+        <div class="card reveal">
+          <div class="org-tabs-wrap">
+            <div class="org-tabs-group">
+              <div class="org-tabs-title">조직도</div>
+              <div class="org-tabs" id="orgTabsA"></div>
+            </div>
+
+            <div class="org-tabs-group">
+              <div class="org-tabs-title">예하 인원 리스트</div>
+              <div class="org-tabs org-tabs--scroll" id="orgTabsB"></div>
+            </div>
+          </div>
+
+          <div class="org-embed org-embed--auto">
+            <iframe
+              id="orgFrame"
+              title="18e 조직도 스프레드시트"
+              src=""
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            ></iframe>
+          </div>
+
+          <div class="muted org-note">
+            만약에 오타나 누락이 있다면, <b>행정부서 / 본부</b>에 연락하시길 바랍니다.
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 훈장 리스트 (스프레드시트 연동 + 검색/희귀도 필터) -->
+    <section class="section section--alt" id="medals">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>훈장 리스트</h2>
+          <p>어떤 훈장이 있는지, 어떻게 하면 받을 수 있는지 표시하는 리스트</p>
+        </div>
+
+        <div class="card reveal">
+          <div class="toolbar">
+            <div class="toolbar__left">
+              <span class="badge badge--gold">스프레드시트 연동</span>
+              <span class="muted">데이터 소스: <code id="medalStatus">샘플</code></span>
+            </div>
+            <div class="toolbar__right">
+              <input class="input" id="medalSearch" placeholder="훈장 검색 (이름/조건)" />
+              <select class="select" id="medalRarity">
+                <option value="">희귀도 전체</option>
+                <option value="Common">Common</option>
+                <option value="Uncommon">Uncommon</option>
+                <option value="Rare">Rare</option>
+                <option value="Epic">Epic</option>
+                <option value="Legendary">Legendary</option>
+              </select>
+              <button class="btn btn--ghost btn--sm" id="reloadMedals">새로고침</button>
+            </div>
+          </div>
+
+          <div id="medalsGrid" class="grid grid--3" aria-live="polite"></div>
+        </div>
+
+        <div class="note">
+          <strong>팁:</strong> 훈장 조건은 “측정 가능한 기준 + 증빙 방식(스크린샷/로그)”까지 같이 적으면 분쟁이 줄어듭니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- 진급 방식 (스프레드시트 연동 + 테이블/검색) -->
+    <section class="section" id="promotion">
+      <div class="container">
+        <div class="section__head reveal">
+          <h2>진급 방식</h2>
+          <p>행정 부서에서 기준에 따라 점수를 계산하여 진급 및 강등, 훈장 여부를 결정합니다.</p>
+        </div>
+
+        <div class="grid grid--2">
+          <article class="card reveal">
+            <h3>진급 기준</h3>
+            <ul class="list">
+              <li><strong>[병사기준]</strong>: 부사관이상의 직급은 해당사항 없음.</li>
+            </ul>
+
+            <div class="divider"></div>
+
+            <div class="toolbar toolbar--tight">
+              <div class="toolbar__right">
+                <input class="input" id="rankSearch" placeholder="계급/조건 검색" />
+                <button class="btn btn--ghost btn--sm" id="reloadPromotion">새로고침</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table" id="promotionTable">
+                <thead>
+                  <tr>
+                    <th>계급</th>
+                    <th>요구 조건</th>
+                    <th>책임</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card reveal">
+            <h3>진급 포인트</h3>
+            <div id="promotionFlow" class="stepper"></div>
+          </article>
+        </div>
+
+        <div class="note note--gold">
+          <strong>권장:</strong> 진급하기 위해서는 꾸준히 훈련과 작전에 참여하는 것을 추천합니다.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__left">
+        <div class="footer__mark" aria-hidden="true"></div>
+        <div>
+          <div class="footer__title">프랑스 제2군단 · 제18연대</div>
+          <div class="footer__sub">France · 2e Corps d’Armée · 18e Régiment</div>
+        </div>
+      </div>
+
+      <div class="footer__right">
+        <small>© 프랑스 2군단 18연대. All rights reserved.</small>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+  <script>window.__IS_ADMIN__ = {{ "true" if is_admin else "false" }};</script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
