@@ -479,7 +479,17 @@ def api_upload_asset():
     else:
         kind = "file"
 
-    return jsonify({"ok": True, "url": url, "kind": kind, "name": filename, "ext": ext, "content_type": content_type})
+    # name: 원본 파일명(에디터 표시용)
+    # stored_name: 서버에 저장된 실제 파일명(UUID 기반)
+    return jsonify({
+        "ok": True,
+        "url": url,
+        "kind": kind,
+        "name": orig_name,
+        "stored_name": safe_name,
+        "ext": ext,
+        "content_type": content_type,
+    })
 
 
 
