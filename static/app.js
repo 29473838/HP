@@ -1411,3 +1411,7 @@ async function initGuideEditor(){
 }
 
 window.addEventListener("load", initGuideEditor);
+state.promotion = (state.promotion || []).map(r => {
+  const isSergent = String(r.rank || "").trim().toLowerCase() === "sergent";
+  return isSergent ? { ...r, requirements: "명예부사관이 되어야 함" } : r;
+});
