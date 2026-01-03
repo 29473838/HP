@@ -10,7 +10,7 @@ import threading
 
 from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_from_directory, abort
 from werkzeug.utils import secure_filename
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from functools import wraps
 
@@ -174,6 +174,38 @@ app = Flask(__name__)
 # 세션 키(배포 시 환경변수 SECRET_KEY 권장)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "18e-secret-key-change-me")
 
+# 관리자 비밀번호 해시
+# - Railway에선 Variables에 ADMIN_PASSWORD_HASH(해시) 또는 ADMIN_PASSWORD(평문)를 넣는 것을 권장
+# - 기본값은 사용자가 요청한 비밀번호(Showker04159*)의 해시값
+DEFAULT_ADMIN_PASSWORD_HASH = "scrypt:32768:8:1$xaFhnhQluDqK4K47$988e4200220006b4ba0db5ec3928f9e5cbb24ac0593c0c66d60c104e2648d447f2736e18d061b4575d4d88777528d8819e12d685044e4ced79a1b66d228cc2c4"
+
+def get_admin_password_hash() -> str:
+    """Return current admin password hash.
+
+    Priority:
+    1) env ADMIN_PASSWORD_HASH (already hashed)
+    2) env ADMIN_PASSWORD (plaintext; hashed once)
+    3) built-in default hash
+
+    We cache the chosen hash in app.config.
+    """
+    h = app.config.get("ADMIN_PASSWORD_HASH")
+    if h:
+        return str(h)
+
+    h = os.environ.get("ADMIN_PASSWORD_HASH")
+    if h:
+        app.config["ADMIN_PASSWORD_HASH"] = h
+        return str(h)
+
+    pwd = os.environ.get("ADMIN_PASSWORD")
+    if pwd:
+        h = generate_password_hash(pwd)
+        app.config["ADMIN_PASSWORD_HASH"] = h
+        return str(h)
+
+    app.config["ADMIN_PASSWORD_HASH"] = DEFAULT_ADMIN_PASSWORD_HASH
+    return DEFAULT_ADMIN_PASSWORD_HASH
 # 업로드 최대 크기(MB). MAX_CONTENT_LENGTH_MB 우선(없으면 MAX_CONTENT_LENGTH 사용).
 _MAX_MB = os.environ.get("MAX_CONTENT_LENGTH_MB") or os.environ.get("MAX_CONTENT_LENGTH") or "1024"
 app.config["MAX_CONTENT_LENGTH"] = int(_MAX_MB) * 1024 * 1024
@@ -315,7 +347,7 @@ def admin_login():
         return render_template('admin_login.html', error=None, next=next_url)
 
     password = (request.form.get('password') or '').strip()
-    if check_password_hash(ADMIN_PASSWORD_HASH, password):
+    if check_password_hash(get_admin_password_hash(), password):
         session['is_admin'] = True
         session['admin_at'] = _iso_now() if '_iso_now' in globals() else datetime.now(timezone.utc).isoformat()
         return redirect(next_url)
