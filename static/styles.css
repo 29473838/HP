@@ -833,3 +833,18 @@ body{
     margin-right: -6px;
   }
 }
+
+#medals select{
+  color-scheme: dark;
+  color: #f2f2f2 !important;
+  background: rgba(14,16,24,.92) !important;
+  border: 1px solid rgba(215,179,90,.28) !important;
+  opacity: 1 !important;
+}
+
+#medals select option{
+  background: #0f121a !important;
+  color: #f2f2f2 !important;
+  opacity: 1 !important;
+}
+
