@@ -12,7 +12,6 @@
 
   --card: rgba(255,255,255,0.06);
   --shadow: 0 18px 60px rgba(0,0,0,0.45);
-  --crest-size: 48px; 
 }
 
 *{box-sizing:border-box}
@@ -882,25 +881,39 @@ body{
   color: rgba(255,255,255,0.92);
 }
 
-.brand__crest{
-  width: var(--crest-size);
-  height: var(--crest-size);
-  display: grid;
-  place-items: center;
-  flex: 0 0 var(--crest-size);
-  border-radius: 12px;
-  overflow: hidden; /* 이미지 넘침 방지 */
+
+
+/* ✅ 상단바 로고(문장) 크기/정렬 강제 수정 */
+.topbar .brand{
+  display:flex !important;
+  align-items:center !important;
+  gap:12px !important;
 }
 
-.brand__crest img{
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover; /* 꽉 차게 */
+/* 여기 숫자(40px)만 바꾸면 로고 크기 조절됨 */
+.topbar .brand__crest{
+  width:40px !important;
+  height:40px !important;
+  flex:0 0 40px !important;
+
+  border-radius:12px !important;
+  overflow:hidden !important;
+  display:block !important;
 }
 
-/* 모바일에서 살짝 줄이기(원하면 값 바꾸면 됨) */
-@media (max-width: 720px){
-  :root{ --crest-size: 40px; }
+.topbar .brand__crest img{
+  width:100% !important;
+  height:100% !important;
+  display:block !important;
+
+  object-fit:cover !important; /* 로고를 꽉 채움(잘림 가능) */
+  /* object-fit:contain !important;  // 잘림 없이 넣고 싶으면 이걸로 교체 */
 }
 
+/* 텍스트가 로고 위로 겹치는 것 방지 */
+.topbar .brand__text{
+  position:static !important;
+  display:flex !important;
+  flex-direction:column !important;
+  line-height:1.1 !important;
+}
