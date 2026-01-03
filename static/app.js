@@ -41,7 +41,7 @@ const SAMPLE = {
     { medal_id:"II_J1", name:"봉사 팬던트 - 금장", icon:"⚜", summary:"x", how_to_earn:"문서 작업, 모집 지원, 기타 잡무 등 부대 유지에 필요한 헌신적인 노력을 기울인 병사에게 수여", rarity:"Gold", sort:"48" },
     { medal_id:"II_J2", name:"봉사 팬던트 - 은장", icon:"⚜", summary:"x", how_to_earn:"문서 작업, 모집 지원, 기타 잡무 등 부대 유지에 필요한 헌신적인 노력을 기울인 병사에게 수여", rarity:"Silver", sort:"58" },
     { medal_id:"II_J3", name:"봉사 팬던트 - 동장", icon:"⚜", summary:"x", how_to_earn:"문서 작업, 모집 지원, 기타 잡무 등 부대 유지에 필요한 헌신적인 노력을 기울인 병사에게 수여", rarity:"Bronze", sort:"68" },
-    { medal_id:"II_J3", name:"정예 펜던트 - 동장", icon:"⚜", summary:"x", how_to_earn:"연대 내 정예 대대에서 최고의 실력을 증명한 병사에게 수여", rarity:"Bronze", sort:"69" },
+    { medal_id:"II_K3", name:"정예 펜던트 - 동장", icon:"⚜", summary:"x", how_to_earn:"연대 내 정예 대대에서 최고의 실력을 증명한 병사에게 수여", rarity:"Bronze", sort:"69" },
 
   ],
   ORG: [
