@@ -636,6 +636,40 @@ body{
   border-radius: 16px;
   border: 1px solid rgba(215,179,90,0.20);
   background: rgba(255,255,255,0.03);
+
+.guide-view .ql-editor{
+  padding: 0;
+  font-family: "Spectral", ui-serif, Georgia, serif;
+  color: rgba(233,237,247,0.92);
+}
+.guide-view .ql-editor .ql-align-center{ text-align: center; }
+.guide-view .ql-editor .ql-align-right{ text-align: right; }
+.guide-view .ql-editor .ql-align-left{ text-align: left; }
+.guide-view .ql-editor .ql-size-small{ font-size: 0.85em; }
+.guide-view .ql-editor .ql-size-large{ font-size: 1.35em; }
+.guide-view .ql-editor .ql-size-huge{ font-size: 1.9em; }
+
+/* 업로드 미디어(비디오/오디오) 표시 */
+.guide-view video,
+.guide-view audio{
+  max-width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(215,179,90,0.20);
+  background: rgba(255,255,255,0.03);
+  display:block;
+  margin-left:auto;
+  margin-right:auto;
+}
+#guideEditor .ql-editor video,
+#guideEditor .ql-editor audio{
+  max-width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(215,179,90,0.20);
+  background: rgba(255,255,255,0.03);
+  display:block;
+  margin-left:auto;
+  margin-right:auto;
+}
 }
 
 /* Quill theming on dark background */
@@ -694,7 +728,9 @@ body{
 .guide-img-tools button.danger{border-color: rgba(139,26,43,0.45)}
 .guide-img-tools input[type="range"]{flex: 1 1 220px}
 
-#guideEditor .ql-editor img.is-selected{
+#guideEditor .ql-editor img.is-selected,
+#guideEditor .ql-editor video.is-selected,
+#guideEditor .ql-editor audio.is-selected{
   outline: 2px solid rgba(215,179,90,0.55);
   outline-offset: 2px;
 }

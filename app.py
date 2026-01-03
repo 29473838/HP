@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import uuid
 import json
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+import shutil
+import threading
 
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_from_directory
+from flask import Flask, jsonify, render_template, request, session, redirect, url_for, send_from_directory, abort
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 
@@ -35,10 +36,8 @@ GUIDE_FILE = DATA_DIR / "guide.html"
 GUIDE_DELTA_FILE = DATA_DIR / "guide_delta.json"
 MEDAL_IMAGES_FILE = DATA_DIR / "medal_images.json"
 
-# 관리자 비밀번호는 해시로 저장됩니다. (환경변수 ADMIN_PASSWORD_HASH로 덮어쓸 수 있음)
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", 'scrypt:32768:8:1$GH4CbJkloIf3hOzE$7614f33eef03ba54161eb4dd0658df64908975a80d55ffde66505bab666a57c772efffe03a2c7b0099152aed47cd733c683788fb518af3ada906d48a44fc0384')
-
-ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".jfif"}
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def _seed_tree(src_root: Path, dst_root: Path, overwrite: bool = False) -> None:
     if not src_root.exists():
@@ -56,21 +55,41 @@ def _seed_tree(src_root: Path, dst_root: Path, overwrite: bool = False) -> None:
             shutil.copy2(p, dst)
 
 def _bootstrap_persistent() -> None:
-    # 폴더 생성
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    # Railway Volume이 비어있을 때: 레포에 들어있는 기존 데이터(작은 파일)만 1회 복사
+    # 업로드(특히 mp4)는 용량이 커서 부팅이 느려지면 플랫폼이 종료할 수 있어 기본 OFF
+    if not PERSIST_ROOT:
+        return
 
-    # Railway Volume이 비어있을 때: 레포에 들어있는 기존 데이터/업로드를 1회 복사(씨딩)
     force = str(os.environ.get("FORCE_BOOTSTRAP") or "").lower() in ("1", "true", "yes")
-    if PERSIST_ROOT:
+    seed_uploads = str(os.environ.get("SEED_UPLOADS_ON_BOOT") or "").lower() in ("1", "true", "yes")
+
+    try:
         data_empty = not any(DATA_DIR.iterdir())
+    except Exception:
+        data_empty = True
+
+    try:
         up_empty = not any(UPLOAD_DIR.iterdir())
-        if force or data_empty:
-            _seed_tree(REPO_DATA_DIR, DATA_DIR, overwrite=False)
-        if force or up_empty:
-            _seed_tree(REPO_UPLOADS_DIR, UPLOAD_DIR, overwrite=False)
+    except Exception:
+        up_empty = True
+
+    if force or data_empty:
+        _seed_tree(REPO_DATA_DIR, DATA_DIR, overwrite=False)
+
+    # ⚠️ 기본 OFF. 필요하면 Railway Variables에 SEED_UPLOADS_ON_BOOT=1을 "한 번만" 켜고 배포 후 끄기.
+    if seed_uploads and (force or up_empty):
+        _seed_tree(REPO_UPLOADS_DIR, UPLOAD_DIR, overwrite=False)
 
 _bootstrap_persistent()
+
+ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".jfif"}
+
+ALLOWED_VIDEO_EXTS = {".mp4", ".webm", ".ogg", ".mov", ".mkv", ".avi"}
+ALLOWED_AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"}
+# 보안상 위험할 수 있는 확장자는 업로드 차단(정적 경로에서 실행/다운로드 방지)
+BLOCKED_ASSET_EXTS = {".py", ".js", ".html", ".htm", ".css", ".exe", ".bat", ".cmd", ".ps1", ".sh", ".dll"}
+
+
 css_sanitizer = CSSSanitizer(
     allowed_css_properties=[
         "color",
@@ -134,6 +153,10 @@ ALLOWED_TAGS = [
     "tr",
     "th",
     "td",
+
+    "video",
+    "audio",
+    "source",
 ]
 
 ALLOWED_ATTRS = {
@@ -142,15 +165,19 @@ ALLOWED_ATTRS = {
     "img": ["src", "alt", "title", "width", "height", "class", "style"],
     "th": ["colspan", "rowspan", "class", "style"],
     "td": ["colspan", "rowspan", "class", "style"],
+    "video": ["src", "poster", "preload", "controls", "autoplay", "loop", "muted", "playsinline", "class", "style"],
+    "audio": ["src", "preload", "controls", "autoplay", "loop", "muted", "class", "style"],
+    "source": ["src", "type"],
 }
 
 app = Flask(__name__)
 # 세션 키(배포 시 환경변수 SECRET_KEY 권장)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "18e-secret-key-change-me")
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-# 이미지 업로드 등 기본 제한(필요 시 조절)
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "1024")) * 1024 * 1024  # MB
+
+# 업로드 최대 크기(MB). MAX_CONTENT_LENGTH_MB 우선(없으면 MAX_CONTENT_LENGTH 사용).
+_MAX_MB = os.environ.get("MAX_CONTENT_LENGTH_MB") or os.environ.get("MAX_CONTENT_LENGTH") or "250"
+app.config["MAX_CONTENT_LENGTH"] = int(_MAX_MB) * 1024 * 1024
+
 
 
 
@@ -165,6 +192,90 @@ def admin_required_api(fn):
         return fn(*args, **kwargs)
     return wrapper
 
+def admin_required_page(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not is_admin():
+            return redirect(url_for('admin_login', next=request.path))
+        return fn(*args, **kwargs)
+    return wrapper
+
+# 업로드 파일은 /static/uploads/ 로 접근하지만, 실제 저장은 Volume(UPLOAD_DIR)일 수 있어 별도 서빙 라우트를 둡니다.
+@app.get("/static/uploads/<path:filename>")
+def serve_uploads(filename: str):
+    p = UPLOAD_DIR / filename
+    if p.exists() and p.is_file():
+        return send_from_directory(UPLOAD_DIR, filename)
+
+    rp = REPO_UPLOADS_DIR / filename
+    if rp.exists() and rp.is_file():
+        return send_from_directory(REPO_UPLOADS_DIR, filename)
+
+    abort(404)
+
+# 업로드 마이그레이션(레포 static/uploads -> Volume uploads) : 부팅 시 느려서 재시작되는 문제를 피하기 위해 수동 실행
+_migrate_state = {"running": False, "done": False, "copied": 0, "skipped": 0, "errors": 0, "last_error": None}
+_migrate_lock = threading.Lock()
+
+def _migrate_uploads_job(overwrite: bool = False):
+    src = REPO_UPLOADS_DIR
+    dst = UPLOAD_DIR
+    with _migrate_lock:
+        _migrate_state.update({"running": True, "done": False, "copied": 0, "skipped": 0, "errors": 0, "last_error": None})
+
+    try:
+        if not src.exists():
+            return
+        dst.mkdir(parents=True, exist_ok=True)
+
+        for p in src.rglob("*"):
+            try:
+                rel = p.relative_to(src)
+                out = dst / rel
+                if p.is_dir():
+                    out.mkdir(parents=True, exist_ok=True)
+                    continue
+
+                if out.exists() and not overwrite:
+                    with _migrate_lock:
+                        _migrate_state["skipped"] += 1
+                    continue
+
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, out)
+                with _migrate_lock:
+                    _migrate_state["copied"] += 1
+            except Exception as e:
+                with _migrate_lock:
+                    _migrate_state["errors"] += 1
+                    _migrate_state["last_error"] = str(e)
+    finally:
+        with _migrate_lock:
+            _migrate_state["running"] = False
+            _migrate_state["done"] = True
+
+@app.get("/api/admin/migrate-uploads")
+@admin_required_api
+def api_migrate_uploads_status():
+    with _migrate_lock:
+        return jsonify(_migrate_state)
+
+@app.post("/api/admin/migrate-uploads")
+@admin_required_api
+def api_migrate_uploads_start():
+    with _migrate_lock:
+        if _migrate_state.get("running"):
+            return jsonify({"ok": True, "started": False, "state": _migrate_state})
+
+    overwrite = str(request.args.get("overwrite") or "").lower() in ("1", "true", "yes")
+    t = threading.Thread(target=_migrate_uploads_job, args=(overwrite,), daemon=True)
+    t.start()
+    return jsonify({"ok": True, "started": True})
+
+@app.get("/admin/tools")
+@admin_required_page
+def admin_tools():
+    return render_template("admin_tools.html")
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     next_url = request.args.get('next') or request.form.get('next') or url_for('home')
@@ -193,12 +304,6 @@ def home():
     return render_template("index.html", is_admin=is_admin())
 
 
-@app.get('/static/uploads/<path:filename>')
-def serve_uploads(filename: str):
-    # UPLOAD_DIR이 static 폴더 밖(예: Railway Volume)이어도 /static/uploads/...로 접근 가능
-    return send_from_directory(UPLOAD_DIR, filename)
-
-
 def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -216,7 +321,14 @@ def api_get_guide():
     if GUIDE_FILE.exists():
         html = GUIDE_FILE.read_text(encoding="utf-8")
 
-    return jsonify({"html": html, "updated_at": _file_mtime_iso(GUIDE_FILE)})
+    delta = None
+    if GUIDE_DELTA_FILE.exists():
+        try:
+            delta = json.loads(GUIDE_DELTA_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            delta = None
+
+    return jsonify({"html": html, "delta": delta, "updated_at": _file_mtime_iso(GUIDE_FILE)})
 
 
 @app.post("/api/guide")
@@ -224,10 +336,37 @@ def api_get_guide():
 def api_save_guide():
     data = request.get_json(silent=True) or {}
     html = str(data.get("html") or "")
+    delta = data.get("delta")
 
     # 너무 큰 본문 제한(대략)
-    if len(html) > 300_000:
+    if len(html) > 500_000:
         return jsonify({"error": "content_too_large"}), 413
+
+    # Delta 저장(서식/정렬/크기 등 유지용)
+    if delta is not None:
+        try:
+            if not isinstance(delta, dict) or "ops" not in delta or not isinstance(delta["ops"], list):
+                return jsonify({"error": "invalid_delta"}), 400
+            if len(delta["ops"]) > 20_000:
+                return jsonify({"error": "delta_too_large"}), 413
+
+            for op in delta["ops"][:5000]:
+                if not isinstance(op, dict):
+                    continue
+                ins = op.get("insert")
+                if isinstance(ins, dict):
+                    for _, v in ins.items():
+                        url = ""
+                        if isinstance(v, dict):
+                            url = str(v.get("url") or v.get("src") or "")
+                        else:
+                            url = str(v or "")
+                        if url.startswith("javascript:"):
+                            return jsonify({"error": "invalid_url"}), 400
+
+            GUIDE_DELTA_FILE.write_text(json.dumps(delta, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            return jsonify({"error": "invalid_delta"}), 400
 
     cleaned = bleach.clean(
         html,
@@ -236,10 +375,7 @@ def api_save_guide():
         protocols=["http", "https", "data"],
         strip=True,
         css_sanitizer=css_sanitizer,
-    )
-
-    # Quill이 빈 문서로 저장할 때 <p><br></p>로 오는 경우가 많아서 정리
-    cleaned = cleaned.strip()
+    ).strip()
 
     GUIDE_FILE.write_text(cleaned, encoding="utf-8")
     return jsonify({"ok": True, "html": cleaned, "updated_at": _file_mtime_iso(GUIDE_FILE)})
@@ -259,12 +395,8 @@ def api_upload_image():
     if not f or not f.filename:
         return jsonify({"error": "empty_filename"}), 400
 
-    orig_ext = Path(f.filename).suffix.lower()
     filename = secure_filename(f.filename)
-    ext = orig_ext or Path(filename).suffix.lower()
-
-    if not ext:
-        return jsonify({"error": "missing_extension"}), 400
+    ext = Path(filename).suffix.lower()
 
     if ext not in ALLOWED_IMAGE_EXTS:
         return jsonify({"error": "unsupported_file_type"}), 400
@@ -275,6 +407,45 @@ def api_upload_image():
 
     url = f"/static/uploads/{safe_name}"
     return jsonify({"ok": True, "url": url})
+
+
+
+@app.post("/api/upload-asset")
+@admin_required_api
+def api_upload_asset():
+    """
+    이미지/동영상/오디오/일반 파일 업로드를 지원합니다.
+    - 브라우저 재생은 포맷 지원 여부(예: MKV)에 따라 달라질 수 있습니다.
+    """
+    f = request.files.get("file") or request.files.get("image") or request.files.get("upload")
+    if not f or not f.filename:
+        return jsonify({"error": "missing_file", "received_keys": list(request.files.keys())}), 400
+
+    filename = secure_filename(f.filename)
+    ext = Path(filename).suffix.lower()
+
+    if ext in BLOCKED_ASSET_EXTS:
+        return jsonify({"error": "blocked_file_type"}), 400
+    if not ext:
+        return jsonify({"error": "missing_extension"}), 400
+
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    out_path = UPLOAD_DIR / safe_name
+    f.save(out_path)
+
+    url = f"/static/uploads/{safe_name}"
+    content_type = (f.mimetype or "").lower()
+
+    if ext in ALLOWED_IMAGE_EXTS or content_type.startswith("image/"):
+        kind = "image"
+    elif ext in ALLOWED_VIDEO_EXTS or content_type.startswith("video/"):
+        kind = "video"
+    elif ext in ALLOWED_AUDIO_EXTS or content_type.startswith("audio/"):
+        kind = "audio"
+    else:
+        kind = "file"
+
+    return jsonify({"ok": True, "url": url, "kind": kind, "name": filename, "ext": ext, "content_type": content_type})
 
 
 
@@ -321,4 +492,4 @@ def api_set_medal_image():
 
 if __name__ == "__main__":
     # Windows에서 폴더 경로 문제 줄이기 위해 host 지정 안 함
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8000")), debug=False)
+    app.run(debug=True, port=8000)

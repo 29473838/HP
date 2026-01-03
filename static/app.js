@@ -824,6 +824,10 @@ async function apiJSON(url, opts){
   return res.json();
 }
 
+function wrapGuideView(html){
+  return `<div class="ql-editor">${html || ""}</div>`;
+}
+
 function defaultGuideHTML(){
   return `
     <h3>기본 규칙</h3>
@@ -843,23 +847,25 @@ function defaultGuideHTML(){
   `;
 }
 
-async function uploadGuideImage(file){
+async function uploadGuideAsset(file){
   const fd = new FormData();
-  fd.append("image", file);
-  try{
-    const data = await apiJSON("/api/upload-image", { method:"POST", body: fd });
-    return data.url;
-  }catch(e){
-    // 로그인 세션이 풀렸거나(401) 권한이 없으면 로그인으로 이동
-    if (handleAdmin401(e)) throw e;
-    throw e;
+  fd.append("file", file);
+  const data = await apiJSON("/api/upload-asset", { method: "POST", body: fd });
+  return data;
+}
+
+async function uploadGuideImage(file){
+  const data = await uploadGuideAsset(file);
+  if (!data || !data.ok || data.kind !== "image"){
+    throw new Error("이미지 업로드가 아닙니다.");
   }
+  return data.url;
 }
 
 // Quill 에디터에서 이미지 클릭 시 크기/정렬을 조절할 수 있는 간단 툴박스
-function attachGuideImageTools(quill){
-  if (!quill || quill.__imgToolsAttached) return;
-  quill.__imgToolsAttached = true;
+function attachGuideMediaTools(quill){
+  if (!quill || quill.__mediaToolsAttached) return;
+  quill.__mediaToolsAttached = true;
 
   const root = quill.root;
   const wrap = document.getElementById("guideEditorWrap");
@@ -888,94 +894,97 @@ function attachGuideImageTools(quill){
   `;
   document.body.appendChild(tools);
 
-  let currentImg = null;
+  let currentEl = null;
   const slider = tools.querySelector('input[type="range"]');
   const valueEl = tools.querySelector('.guide-img-tools__value');
 
   function hide(){
     tools.classList.remove("show");
-    if (currentImg) currentImg.classList.remove("is-selected");
-    currentImg = null;
+    if (currentEl) currentEl.classList.remove("is-selected");
+    currentEl = null;
   }
 
   function applyWidth(percent){
-    if (!currentImg) return;
-    currentImg.style.width = `${percent}%`;
-    currentImg.style.height = "auto";
-    currentImg.style.maxWidth = "100%";
-    currentImg.style.display = "block";
+    if (!currentEl) return;
+    currentEl.style.width = `${percent}%`;
+    currentEl.style.maxWidth = "100%";
+    currentEl.style.display = "block";
+    if (currentEl.tagName === "IMG" || currentEl.tagName === "VIDEO"){
+      currentEl.style.height = "auto";
+    }
   }
 
   function applyAlign(align){
-    if (!currentImg) return;
-    currentImg.style.display = "block";
-    currentImg.style.maxWidth = "100%";
+    if (!currentEl) return;
+    currentEl.style.display = "block";
+    currentEl.style.maxWidth = "100%";
     if (align === "left"){
-      currentImg.style.marginLeft = "0";
-      currentImg.style.marginRight = "auto";
+      currentEl.style.marginLeft = "0";
+      currentEl.style.marginRight = "auto";
     } else if (align === "center"){
-      currentImg.style.marginLeft = "auto";
-      currentImg.style.marginRight = "auto";
+      currentEl.style.marginLeft = "auto";
+      currentEl.style.marginRight = "auto";
     } else if (align === "right"){
-      currentImg.style.marginLeft = "auto";
-      currentImg.style.marginRight = "0";
+      currentEl.style.marginLeft = "auto";
+      currentEl.style.marginRight = "0";
     }
   }
 
   function position(){
-    if (!currentImg) return;
-    const r = currentImg.getBoundingClientRect();
+    if (!currentEl) return;
+    const r = currentEl.getBoundingClientRect();
     const top = Math.max(12, r.top - tools.offsetHeight - 10);
     const left = Math.min(window.innerWidth - tools.offsetWidth - 12, Math.max(12, r.left));
     tools.style.top = `${top + window.scrollY}px`;
     tools.style.left = `${left + window.scrollX}px`;
   }
 
-  // 이미지 클릭 시 툴박스 표시
-  root.addEventListener("click", (ev) => {
-    // 편집 모드일 때만
-    if (wrap.hidden) return;
-    const t = ev.target;
-    if (t && t.tagName === "IMG"){
-      ev.preventDefault();
-      if (currentImg && currentImg !== t) currentImg.classList.remove("is-selected");
-      currentImg = t;
-      currentImg.classList.add("is-selected");
+  root.addEventListener("click", (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLElement)) return;
 
-      // 기본 값 동기화
-      const w = parseInt(String(currentImg.style.width || "").replace("%",""), 10);
-      const percent = Number.isFinite(w) && w > 0 ? w : 80;
-      slider.value = String(percent);
-      valueEl.textContent = `${percent}%`;
+    // IMG / VIDEO / AUDIO만 대상
+    const media = target.closest("img,video,audio");
+    if (!media || !(media instanceof HTMLElement)) return;
 
-      tools.classList.add("show");
-      position();
-    } else {
-      hide();
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (currentEl && currentEl !== media){
+      currentEl.classList.remove("is-selected");
     }
+    currentEl = media;
+    currentEl.classList.add("is-selected");
+
+    // 현재 스타일을 슬라이더에 반영
+    const w = (currentEl.style.width || "").replace("%", "");
+    const p = w ? parseInt(w, 10) : 80;
+    slider.value = String(isFinite(p) ? p : 80);
+    valueEl.textContent = `${slider.value}%`;
+
+    tools.classList.add("show");
+    position();
   });
 
-  // 외부 클릭 시 닫기
-  document.addEventListener("click", (ev) => {
-    if (!currentImg) return;
-    const el = ev.target;
-    if (el === currentImg) return;
-    if (tools.contains(el)) return;
-    // 편집 래퍼 밖 클릭이면 닫기
-    if (!document.getElementById("guideEditorWrap")?.contains(el)) hide();
+  // 에디터 밖 클릭 시 닫기
+  document.addEventListener("click", (e) => {
+    if (!currentEl) return;
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    if (tools.contains(t)) return;
+    if (root.contains(t)) return;
+    hide();
   });
 
-  // 리사이즈/스크롤 시 위치 재계산
-  window.addEventListener("resize", position);
-  window.addEventListener("scroll", position, { passive: true });
+  window.addEventListener("scroll", () => { if (currentEl) position(); }, { passive: true });
 
-  // 버튼/슬라이더 동작
-  tools.addEventListener("click", (ev) => {
-    const btn = ev.target.closest("button");
-    if (!btn || !currentImg) return;
-    const w = btn.getAttribute("data-w");
-    const align = btn.getAttribute("data-align");
-    const action = btn.getAttribute("data-action");
+  tools.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !(btn instanceof HTMLButtonElement)) return;
+
+    const w = btn.dataset.w;
+    const align = btn.dataset.align;
+    const action = btn.dataset.action;
 
     if (w){
       const p = parseInt(w, 10);
@@ -992,7 +1001,7 @@ function attachGuideImageTools(quill){
       return;
     }
     if (action === "remove"){
-      currentImg.remove();
+      currentEl.remove();
       hide();
     }
   });
@@ -1005,9 +1014,89 @@ function attachGuideImageTools(quill){
   });
 }
 
+
 function ensureQuill(){
   if (window.__guideQuill) return window.__guideQuill;
   if (!window.Quill) throw new Error("Quill이 로드되지 않았습니다.");
+
+  // 커스텀 오디오/비디오 블롯 등록 (업로드한 파일을 <video>/<audio>로 삽입)
+  if (!window.__guideBlotsRegistered){
+    const BlockEmbed = Quill.import("blots/block/embed");
+
+    class HtmlVideoBlot extends BlockEmbed {
+      static blotName = "htmlVideo";
+      static tagName = "video";
+
+      static create(value){
+        const node = super.create();
+        node.setAttribute("controls", "");
+        node.setAttribute("preload", "metadata");
+        node.setAttribute("playsinline", "");
+        node.style.width = (value && value.width) ? value.width : "80%";
+        node.style.maxWidth = "100%";
+        node.style.display = "block";
+        node.style.marginLeft = "auto";
+        node.style.marginRight = "auto";
+        node.style.borderRadius = "16px";
+
+        const url = typeof value === "string" ? value : (value?.url || "");
+        const type = typeof value === "object" ? (value?.type || "") : "";
+
+        node.innerHTML = "";
+        const source = document.createElement("source");
+        source.setAttribute("src", url);
+        if (type) source.setAttribute("type", type);
+        node.appendChild(source);
+        return node;
+      }
+
+      static value(node){
+        const source = node.querySelector("source");
+        return {
+          url: source?.getAttribute("src") || "",
+          type: source?.getAttribute("type") || "",
+        };
+      }
+    }
+
+    class HtmlAudioBlot extends BlockEmbed {
+      static blotName = "htmlAudio";
+      static tagName = "audio";
+
+      static create(value){
+        const node = super.create();
+        node.setAttribute("controls", "");
+        node.setAttribute("preload", "metadata");
+        node.style.width = (value && value.width) ? value.width : "100%";
+        node.style.maxWidth = "100%";
+        node.style.display = "block";
+        node.style.marginLeft = "auto";
+        node.style.marginRight = "auto";
+
+        const url = typeof value === "string" ? value : (value?.url || "");
+        const type = typeof value === "object" ? (value?.type || "") : "";
+
+        node.innerHTML = "";
+        const source = document.createElement("source");
+        source.setAttribute("src", url);
+        if (type) source.setAttribute("type", type);
+        node.appendChild(source);
+        return node;
+      }
+
+      static value(node){
+        const source = node.querySelector("source");
+        return {
+          url: source?.getAttribute("src") || "",
+          type: source?.getAttribute("type") || "",
+        };
+      }
+    }
+
+    Quill.register(HtmlVideoBlot);
+    Quill.register(HtmlAudioBlot);
+    window.__guideBlotsRegistered = true;
+  }
 
   const toolbar = [
     [{ header: [1,2,3,false] }],
@@ -1017,7 +1106,7 @@ function ensureQuill(){
     [{ align: [] }],
     [{ list: "ordered" }, { list: "bullet" }],
     ["blockquote", "code-block"],
-    ["link", "image"],
+    ["link", "image", "video"],
     ["clean"]
   ];
 
@@ -1031,26 +1120,23 @@ function ensureQuill(){
           image: async function(){
             const input = document.createElement("input");
             input.type = "file";
-            input.accept = "image/*";
+            input.accept = "image/*,.png,.jpg,.jpeg,.gif,.webp";
             input.click();
 
             input.onchange = async () => {
               const file = input.files?.[0];
               if (!file) return;
 
-              // 8MB 정도까지만 (서버 제한과 맞추기)
-              if (file.size > 8 * 1024 * 1024){
-                alert("이미지 용량이 너무 큽니다. (최대 8MB)");
-                return;
-              }
-
               try{
-                const url = await uploadGuideImage(file);
+                const data = await uploadGuideAsset(file);
+                if (data.kind !== "image") throw new Error("이미지 파일이 아닙니다.");
+
+                const url = data.url;
                 const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
                 quill.insertEmbed(range.index, "image", url, "user");
                 quill.setSelection(range.index + 1, 0);
 
-                // 삽입 직후 기본 스타일(네이버 블로그 느낌: 적당히 크게 + 가운데)
+                // 기본 스타일: 80% + 가운데
                 setTimeout(() => {
                   const imgs = quill.root.querySelectorAll(`img[src="${url}"]`);
                   const img = imgs[imgs.length - 1];
@@ -1070,18 +1156,127 @@ function ensureQuill(){
                 }
               }
             };
+          },
+
+          video: async function(){
+            const input = document.createElement("input");
+            input.type = "file";
+            // MKV까지 선택 가능하게
+            input.accept = "video/*,.mkv,.mp4,.webm,.mov,.avi";
+            input.click();
+
+            input.onchange = async () => {
+              const file = input.files?.[0];
+              if (!file) return;
+
+              try{
+                const data = await uploadGuideAsset(file);
+
+                const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+
+                if (data.kind === "video"){
+                  quill.insertEmbed(range.index, "htmlVideo", { url: data.url, type: data.content_type || "" }, "user");
+                  quill.insertText(range.index + 1, "\n", "user");
+                  // MKV 등 브라우저 미지원 포맷 대비 다운로드 링크도 같이
+                  quill.insertText(range.index + 2, `다운로드: ${data.name || "video"}`, { link: data.url }, "user");
+                  quill.insertText(range.index + 2 + (`다운로드: ${data.name || "video"}`).length, "\n", "user");
+                  quill.setSelection(range.index + 3, 0);
+                } else {
+                  // 비디오로 판정 안 되면 링크로 삽입
+                  quill.insertText(range.index, data.name || "파일", { link: data.url }, "user");
+                  quill.insertText(range.index + (data.name || "파일").length, "\n", "user");
+                }
+              }catch(e){
+                console.error(e);
+                if (!handleAdmin401(e)){
+                  alert("동영상 업로드에 실패했습니다.\n" + (e?.message || e));
+                }
+              }
+            };
           }
         }
       }
     }
   });
 
-  // 이미지 클릭 시 크기/정렬 조절 툴박스 활성화
-  attachGuideImageTools(quill);
+  // 오디오/파일(첨부) 버튼을 툴바에 추가
+  const tb = quill.getModule("toolbar");
+  if (tb && tb.container && !tb.container.querySelector(".ql-audio")){
+    const group = document.createElement("span");
+    group.className = "ql-formats";
+    group.innerHTML = `
+      <button type="button" class="ql-audio" title="오디오 업로드">♫</button>
+      <button type="button" class="ql-attach" title="파일 업로드">📎</button>
+    `;
+    tb.container.appendChild(group);
+
+    tb.addHandler("audio", async () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac";
+      input.click();
+
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        try{
+          const data = await uploadGuideAsset(file);
+          const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+
+          if (data.kind === "audio"){
+            quill.insertEmbed(range.index, "htmlAudio", { url: data.url, type: data.content_type || "" }, "user");
+            quill.insertText(range.index + 1, "\n", "user");
+            quill.insertText(range.index + 2, `다운로드: ${data.name || "audio"}`, { link: data.url }, "user");
+            quill.insertText(range.index + 2 + (`다운로드: ${data.name || "audio"}`).length, "\n", "user");
+            quill.setSelection(range.index + 3, 0);
+          } else {
+            quill.insertText(range.index, data.name || "파일", { link: data.url }, "user");
+            quill.insertText(range.index + (data.name || "파일").length, "\n", "user");
+          }
+        }catch(e){
+          console.error(e);
+          if (!handleAdmin401(e)){
+            alert("오디오 업로드에 실패했습니다.\n" + (e?.message || e));
+          }
+        }
+      };
+    });
+
+    tb.addHandler("attach", async () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "*/*";
+      input.click();
+
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        try{
+          const data = await uploadGuideAsset(file);
+          const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+          const label = data.name || "파일";
+          quill.insertText(range.index, label, { link: data.url }, "user");
+          quill.insertText(range.index + label.length, "\n", "user");
+          quill.setSelection(range.index + label.length + 1, 0);
+        }catch(e){
+          console.error(e);
+          if (!handleAdmin401(e)){
+            alert("파일 업로드에 실패했습니다.\n" + (e?.message || e));
+          }
+        }
+      };
+    });
+  }
+
+  // 이미지/비디오/오디오 클릭 시 크기/정렬 조절 툴박스 활성화
+  attachGuideMediaTools(quill);
 
   window.__guideQuill = quill;
   return quill;
 }
+
 
 async function initGuideEditor(){
   const view = $("guideView");
@@ -1096,6 +1291,7 @@ async function initGuideEditor(){
 
   let currentHTML = "";
   let currentUpdatedAt = "-";
+  let currentDelta = null;
 
   function setMode(editing){
     if (!canEdit) return;
@@ -1119,13 +1315,14 @@ async function initGuideEditor(){
       const data = await apiJSON("/api/guide", { method:"GET" });
       currentHTML = (data.html || "").trim();
       currentUpdatedAt = data.updated_at || "-";
+      currentDelta = data.delta || null;
     }catch(e){
       console.error(e);
       // 읽기라도 보여주기
       currentHTML = currentHTML || "";
     }
 
-    view.innerHTML = currentHTML || defaultGuideHTML();
+    view.innerHTML = wrapGuideView(currentHTML || defaultGuideHTML());
     savedAt.textContent = currentUpdatedAt;
     if (canEdit) setMode(false);
   }
@@ -1139,11 +1336,20 @@ async function initGuideEditor(){
   const quill = ensureQuill();
 
   editBtn.addEventListener("click", () => {
-    quill.root.innerHTML = currentHTML || defaultGuideHTML();
+    // 저장된 Delta가 있으면 그대로 복원(서식 유지)
+    if (currentDelta){
+      quill.setContents(currentDelta);
+    } else {
+      quill.setContents(quill.clipboard.convert(currentHTML || defaultGuideHTML()));
+    }
     setMode(true);
   });
 
   cancelBtn.addEventListener("click", () => {
+    // 편집 취소 시 저장된 내용으로 되돌림
+    if (currentDelta){
+      quill.setContents(currentDelta);
+    }
     setMode(false);
   });
 
@@ -1151,14 +1357,17 @@ async function initGuideEditor(){
     saveBtn.disabled = true;
     try{
       const html = quill.root.innerHTML;
+      const delta = quill.getContents();
       const data = await apiJSON("/api/guide", {
         method:"POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html })
+        body: JSON.stringify({ html, delta })
       });
+      // 저장 성공 시 현재 Delta 갱신(서식 유지)
+      currentDelta = delta;
       currentHTML = (data.html || "").trim();
       currentUpdatedAt = data.updated_at || "-";
-      view.innerHTML = currentHTML || defaultGuideHTML();
+      view.innerHTML = wrapGuideView(currentHTML || defaultGuideHTML());
       savedAt.textContent = currentUpdatedAt;
       setMode(false);
     }catch(e){
