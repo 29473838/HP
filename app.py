@@ -175,8 +175,10 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "18e-secret-key-change-me")
 
 # 업로드 최대 크기(MB). MAX_CONTENT_LENGTH_MB 우선(없으면 MAX_CONTENT_LENGTH 사용).
-_MAX_MB = os.environ.get("MAX_CONTENT_LENGTH_MB") or os.environ.get("MAX_CONTENT_LENGTH") or "250"
+_MAX_MB = os.environ.get("MAX_CONTENT_LENGTH_MB") or os.environ.get("MAX_CONTENT_LENGTH") or "1024"
 app.config["MAX_CONTENT_LENGTH"] = int(_MAX_MB) * 1024 * 1024
+# 큰 파일 업로드 시 메모리 폭증 방지(작은 폼만 메모리에 유지하고 큰 파일은 임시파일로 스풀)
+app.config["MAX_FORM_MEMORY_SIZE"] = int(os.environ.get("MAX_FORM_MEMORY_SIZE") or str(2 * 1024 * 1024))
 
 
 
@@ -271,6 +273,36 @@ def api_migrate_uploads_start():
     t = threading.Thread(target=_migrate_uploads_job, args=(overwrite,), daemon=True)
     t.start()
     return jsonify({"ok": True, "started": True})
+
+
+
+def _dir_size(p: Path) -> int:
+    total = 0
+    try:
+        for root, _, files in os.walk(p):
+            for fn in files:
+                try:
+                    total += (Path(root) / fn).stat().st_size
+                except Exception:
+                    pass
+    except Exception:
+        return 0
+    return total
+
+
+@app.get("/api/storage-stats")
+@admin_required_api
+def api_storage_stats():
+    return jsonify({
+        "ok": True,
+        "persist_root": PERSIST_ROOT or "",
+        "data_dir": str(DATA_DIR),
+        "upload_dir": str(UPLOAD_DIR),
+        "data_bytes": _dir_size(DATA_DIR),
+        "uploads_bytes": _dir_size(UPLOAD_DIR),
+        "repo_uploads_bytes": _dir_size(REPO_UPLOADS_DIR),
+        "max_upload_mb": int(app.config.get("MAX_CONTENT_LENGTH", 0) // (1024 * 1024)) if app.config.get("MAX_CONTENT_LENGTH") else None,
+    })
 
 @app.get("/admin/tools")
 @admin_required_page
@@ -395,8 +427,9 @@ def api_upload_image():
     if not f or not f.filename:
         return jsonify({"error": "empty_filename"}), 400
 
-    filename = secure_filename(f.filename)
-    ext = Path(filename).suffix.lower()
+    orig_name = (f.filename or "")
+    # 확장자는 원본 파일명에서 추출(한글 파일명도 안전)
+    ext = Path(orig_name).suffix.lower()
 
     if ext not in ALLOWED_IMAGE_EXTS:
         return jsonify({"error": "unsupported_file_type"}), 400
@@ -421,8 +454,9 @@ def api_upload_asset():
     if not f or not f.filename:
         return jsonify({"error": "missing_file", "received_keys": list(request.files.keys())}), 400
 
-    filename = secure_filename(f.filename)
-    ext = Path(filename).suffix.lower()
+    orig_name = (f.filename or "")
+    # 확장자는 원본 파일명에서 추출(한글 파일명도 안전)
+    ext = Path(orig_name).suffix.lower()
 
     if ext in BLOCKED_ASSET_EXTS:
         return jsonify({"error": "blocked_file_type"}), 400

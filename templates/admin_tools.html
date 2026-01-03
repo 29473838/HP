@@ -16,6 +16,14 @@
         Railway Volume을 붙인 경우, 기존 레포의 <code>static/uploads</code> 파일을 Volume(<code>UPLOAD_DIR</code>)로 옮길 수 있습니다.
         (부팅 시 자동 복사는 느려서 서버가 재시작될 수 있어 수동 버튼으로 제공합니다.)
       </p>
+      <div class="note note--gold" style="margin-top:14px;">
+        <strong>저장소 상태</strong>
+        <div class="muted" style="margin-top:6px; font-size:13px;">
+          업로드(영상/이미지)와 가이드 저장이 Volume에 정상 저장되는지 확인하세요.
+        </div>
+        <pre id="storage" style="margin:10px 0 0; white-space:pre-wrap; word-break:break-word; font-size:12px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,215,0,0.18); border-radius:12px; padding:10px;"></pre>
+      </div>
+
 
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
         <button class="btn btn--primary" id="btnMigrate">업로드 파일 마이그레이션 시작</button>
@@ -41,6 +49,24 @@ async function fetchStatus(){
   return data;
 }
 
+
+async function fetchStorage(){
+  const res = await fetch("/api/storage-stats", { credentials: "include" });
+  const data = await res.json();
+  const mb = (b)=> (b/1024/1024).toFixed(1);
+  const lines = [
+    `persist_root: ${data.persist_root || "(없음)"}`,
+    `data_dir: ${data.data_dir}`,
+    `upload_dir: ${data.upload_dir}`,
+    `uploads: ${mb(data.uploads_bytes||0)} MB`,
+    `data: ${mb(data.data_bytes||0)} MB`,
+    `repo_uploads(fallback): ${mb(data.repo_uploads_bytes||0)} MB`,
+    `max_upload_mb: ${data.max_upload_mb ?? "-"}`,
+  ];
+  document.getElementById("storage").textContent = lines.join("\n");
+  return data;
+}
+
 document.getElementById("btnRefresh").addEventListener("click", fetchStatus);
 document.getElementById("btnMigrate").addEventListener("click", async () => {
   await fetch("/api/admin/migrate-uploads", { method:"POST", credentials:"include" });
@@ -48,7 +74,8 @@ document.getElementById("btnMigrate").addEventListener("click", async () => {
 });
 
 fetchStatus();
-setInterval(fetchStatus, 2500);
+fetchStorage();
+setInterval(() => { fetchStatus(); fetchStorage(); }, 2500);
 </script>
 </body>
 </html>
