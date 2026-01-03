@@ -57,7 +57,6 @@ const SAMPLE = {
     { rank:"Caporal", code:"R3", color:"yellow", requirements:"16P", responsibilities:"상병", sort:"40" },
     { rank:"Caporal de Premier", code:"R4", color:"yellow", requirements:"24P", responsibilities:"병장", sort:"50" },
     { rank:"Caporal Fourrier", code:"R5", color:"yellow", requirements:"32P", responsibilities:"일등병장", sort:"60" },
-    { rank:"Sergent", code:"R6", color:"gold", requirements:"명예부사관이 되어야 함", responsibilities:"하사", sort:"70" },
   ],
   GUIDE: [
     { section:"기본 규칙", title:"명령 체계", body:"작전 중 지휘관 지시를 우선합니다.\n의견은 작전 종료 후 보고 채널에서 정리합니다.", sort:"10" },
